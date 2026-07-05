@@ -1,0 +1,7 @@
+'use client'
+
+import { CreditsProvider } from '@/hooks/use-credits'
+
+export default function AIGeneratorLayout({ children }: { children: React.ReactNode }) {
+  return <CreditsProvider>{children}</CreditsProvider>
+}

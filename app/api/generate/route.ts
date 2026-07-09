@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 import { NextRequest } from 'next/server'
+import { GoogleGenAI } from "@google/genai"
 import { getCurrentUser } from '@/lib/auth'
 import { fail, unauthorized } from '@/lib/api'
 import { getGeneratorTool } from '@/lib/generators'
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
     return fail('You are out of credits. Upgrade your plan to keep generating.', 402, { needsUpgrade: true })
   }
 
-  const apiKey = process.env.ABACUSAI_API_KEY
+  const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return fail('AI service is not configured. Please contact support.', 500)
 
   // Resolve effective output limits from the user's plan (FREE = reduced outputs)
@@ -60,77 +61,45 @@ export async function POST(req: NextRequest) {
       try {
         send({ status: 'processing', message: 'Consulting your Business Brain…' })
 
-        const llmRes = await fetch('https://apps.abacus.ai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model: GENERATION_MODEL,
-            messages,
-            stream: true,
-            temperature: 0.9,
-            max_tokens: 8000,
-            response_format: { type: 'json_object' },
-          }),
-        })
+const ai = new GoogleGenAI({
+  apiKey,
+})
 
-        if (!llmRes.ok || !llmRes.body) {
-          const errText = await llmRes.text().catch(() => '')
-          console.error('LLM API error:', llmRes.status, errText)
-          send({ status: 'error', message: 'The AI service is temporarily unavailable. Please try again.' })
-          controller.close()
-          return
-        }
+const prompt = messages
+  .map((m) => `${m.role.toUpperCase()}:\n${m.content}`)
+  .join("\n\n")
 
-        const reader = llmRes.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-        let partialRead = ''
-        let ticks = 0
+const response = await ai.models.generateContent({
+  model: "gemini-2.5-flash",
+  contents: prompt,
+})
 
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          partialRead += decoder.decode(value, { stream: true })
-          const lines = partialRead.split('\n')
-          partialRead = lines.pop() ?? ''
-          for (const line of lines) {
-            const trimmed = line.trim()
-            if (!trimmed.startsWith('data:')) continue
-            const data = trimmed.slice(5).trim()
-            if (data === '[DONE]') continue
-            try {
-              const parsed = JSON.parse(data)
-              const delta = parsed?.choices?.[0]?.delta?.content
-              if (delta) {
-                buffer += delta
-                ticks++
-                if (ticks % 8 === 0) send({ status: 'processing', message: 'Writing your content…' })
-              }
-            } catch {
-              // ignore keep-alive / non-JSON lines
-            }
-          }
-        }
+const buffer = response.text ?? ""
 
-        if (!buffer.trim()) {
-          send({ status: 'error', message: 'The AI returned an empty response. Please try again.' })
-          controller.close()
-          return
-        }
+if (!buffer.trim()) {
+  send({
+    status: "error",
+    message: "The AI returned an empty response."
+  })
+  controller.close()
+  return
+}
 
-        let items
-        try {
-          items = parseGeneration(tool, buffer, limits)
-        } catch (parseErr: any) {
-          console.error('Generation parse error:', parseErr?.message)
-          send({ status: 'error', message: parseErr?.message || 'Could not parse the AI response. Please try again.' })
-          controller.close()
-          return
-        }
+let items
 
+try {
+  items = parseGeneration(tool, buffer, limits)
+} catch (err: any) {
+  console.error(err)
+
+  send({
+    status: "error",
+    message: err?.message ?? "Unable to parse AI response."
+  })
+
+  controller.close()
+  return
+}
         // Consume exactly one credit for a successful generation
         const updatedCredits = (await consumeCredit(user.id)) ?? (await getCredits(user.id))
 

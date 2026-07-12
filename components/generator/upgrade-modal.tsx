@@ -94,22 +94,36 @@ export function UpgradeModal({
         <DialogFooter className="flex-col gap-2 sm:flex-col">
           <Button
   className="w-full h-12 text-base font-semibold"
-  onClick={() => {
-    console.log(selectedPlan)
+  onClick={async () => {
+    const res = await fetch("/api/stripe/checkout", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        plan: selectedPlan,
+      }),
+    })
+
+    const data = await res.json()
+
+    if (data.url) {
+      window.location.href = data.url
+    }
   }}
 >
-  {selectedPlan === 'STARTER'
-    ? 'Upgrade to STARTER'
-    : 'Upgrade to EMPIRE'}
+  {selectedPlan === "STARTER"
+    ? "Upgrade to STARTER"
+    : "Upgrade to EMPIRE"}
 </Button>
 
-          <Button
-            variant="ghost"
-            className="w-full"
-            onClick={() => onOpenChange(false)}
-          >
-            Maybe later
-          </Button>
+<Button
+  variant="ghost"
+  className="w-full"
+  onClick={() => onOpenChange(false)}
+>
+  Maybe later
+</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

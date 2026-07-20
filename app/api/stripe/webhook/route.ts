@@ -63,7 +63,12 @@ console.log("WEBHOOK VERSION 17 JULIO");
         totalCredits = 999999;
         break;
     }
+console.log("Prisma version:", require("@prisma/client/package.json").version);
 
+console.log(
+  "Subscription fields:",
+  Object.keys((prisma as any)._runtimeDataModel.models.Subscription.fields)
+);
     await prisma.subscription.update({
       where: {
         userId,

@@ -21,13 +21,13 @@
     "eslint": "8.57.0",
     "eslint-config-next": "14.2.28",
     "postcss": "^8.5.16",
-    "@prisma/client": "6.19.3",
+    "prisma": "6.19.3",
     "tailwindcss": "^3.4.19",
     "typescript": "5.2.2"
   },
   "dependencies": {
     "@google/genai": "^2.10.0",
-    "@prisma/client": "^6.19.3",
+    "@prisma/client": "6.19.3",
     "@radix-ui/react-accordion": "^1.2.15",
     "@radix-ui/react-alert-dialog": "^1.1.18",
     "@radix-ui/react-aspect-ratio": "^1.1.11",
